@@ -30,12 +30,22 @@
     <button id="add-item-btn">追加</button>
 
     <ul id="item-list">
-      <li>サンプル1</li>
-      <li>サンプル2</li>
+      <li>家族</li>
+      <li>親友</li>
     </ul>
 
     <script>
       // ↓↓↓ ここから下に、スライドのコードを書いてください ↓↓↓
+      const addItemBtn = document.getElementById("add-item-btn");
+      const itemList = document.getElementById("item-list");
+
+// 「追加」ボタンをクリックしたときの処理
+addItemBtn.addEventListener("click", () => {
+  // 新しいli要素を作成して追加
+  const newItem = document.createElement("li");
+  newItem.textContent = "友達";
+  itemList.appendChild(newItem);
+});
     </script>
   </body>
 </html>
