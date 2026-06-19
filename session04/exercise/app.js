@@ -31,6 +31,8 @@ function addTodo(title) {
   //   if (title === "") return;
   //   todos.push({ title: title, done: false });
   //   render();
+
+
   if (title === "") return;
   todos.push({ title: title, done: false });
   render();
