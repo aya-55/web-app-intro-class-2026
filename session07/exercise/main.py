@@ -44,6 +44,13 @@ app = FastAPI(title="TODO API")
 #       allow_methods=["*"],
 #       allow_headers=["*"],
 #   )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- データベース接続について ---
@@ -138,6 +145,8 @@ def delete_todo(todo_id: int):
 #
 # 注意: app.mount() はすべてのパスを受け取るので、ファイルの最後に書いてください
 
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
