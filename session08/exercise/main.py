@@ -12,7 +12,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel,Fieid
 
 # --- FastAPIアプリ ---
 app = FastAPI(title="TODO App")
@@ -54,8 +54,9 @@ def init_db():
 # TODO(実習5): TodoCreate にバリデーションを追加してください
 #   ヒント: from pydantic import Field を追加して
 #           title: str = Field(min_length=1, max_length=100) に書き換える
+from pydantic import Field
 class TodoCreate(BaseModel):
-    title: str  # ← ここにバリデーションを追加
+    title: str = Field(min_length=1, max_length=100)# ← ここにバリデーションを追加
 
 
 class TodoUpdate(BaseModel):
@@ -95,8 +96,13 @@ def create_todo(todo: TodoCreate):
     #         "INSERT INTO todos (title, done) VALUES (?, 0)",
     #         (todo.title,)
     #     )
-    cursor.execute(f"INSERT INTO todos (title, done) VALUES ('{todo.title}', 0)")
+    # cursor.execute(f"INSERT INTO todos (title, done) VALUES ('{todo.title}', 0)")
+    cursor.execute(
+        "INSERT INTO todos (title, done) VALUES (?, 0)",
+        (todo.title,)
+    )
     conn.commit()
+
     todo_id = cursor.lastrowid
 
     conn.close()
@@ -118,6 +124,9 @@ def update_todo(todo_id: int, todo: TodoUpdate):
     #     if existing is None:
     #         conn.close()
     #         raise HTTPException(status_code=404, detail="TODO not found")
+    if existing is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="TODO not found")
 
     # TODO(実習4): パラメータバインディングに修正してください
     #   修正後:
@@ -125,7 +134,8 @@ def update_todo(todo_id: int, todo: TodoUpdate):
     #         "UPDATE todos SET done = ? WHERE id = ?",
     #         (int(todo.done), todo_id)
     #     )
-    cursor.execute(f"UPDATE todos SET done = {int(todo.done)} WHERE id = {todo_id}")
+    #cursor.execute(f"UPDATE todos SET done = {int(todo.done)} WHERE id = {todo_id}")
+    cursor.execute( "UPDATE todos SET done = ? WHERE id = ?",(int(todo.done), todo_id))
     conn.commit()
 
     conn.close()
@@ -146,11 +156,17 @@ def delete_todo(todo_id: int):
     #     if existing is None:
     #         conn.close()
     #         raise HTTPException(status_code=404, detail="TODO not found")
+    cursor.execute("SELECT id FROM todos WHERE id = ?", (todo_id,))
+    existing = cursor.fetchone()
+    if existing is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="TODO not found")
 
     # TODO(実習4): パラメータバインディングに修正してください
     #   修正後:
     #     cursor.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
-    cursor.execute(f"DELETE FROM todos WHERE id = {todo_id}")
+    #cursor.execute(f"DELETE FROM todos WHERE id = {todo_id}")
+    cursor.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
     conn.commit()
 
     conn.close()
