@@ -17,209 +17,235 @@
  */
 
 // サーバー側のAPIのアドレス（main.py の @app.get("/todos") などに対応）
-const API_URL = "/todos";
+const API_URL = "https://cuddly-couscous-7v4xv9x6qqggfr5w6-8000.app.github.dev/todos";
+
+// 現在どちらのタブを開いているかを覚えておく変数（初期値は 'want': これから観る）
+let currentTab = 'want';
 
 // ============================================================
-// TODO操作（CRUD）
+// 2. サーバーからデータを読み込む処理
 // ============================================================
-
-/**
- * TODO一覧を取得して表示する
- */
 async function loadTodos() {
-  // try ... catch: 通信中にエラーが起きても、アプリが止まらないようにする
   try {
-    // サーバーに「一覧をください」とお願いし、返事(response)を待つ
+    // サーバーに「アニメ一覧をください」とお願いする
     const response = await fetch(API_URL);
 
-    // response.ok が false = サーバーがエラーを返したとき
     if (!response.ok) {
-      const error = await response.json(); // エラー内容を取り出す
-      showError(error.detail || "TODOの取得に失敗しました");
-      return; // ここで処理を終える
+      const error = await response.json();
+      showError(error.detail || "アニメ一覧の取得に失敗しました");
+      return;
     }
 
-    // 返ってきたデータ(JSON)をJavaScriptの配列に変換する
+    // 返ってきたデータをJavaScriptの配列に変換して画面に描画する
     const todos = await response.json();
-    renderTodos(todos); // 画面に描画する
+    renderTodos(todos);
   } catch (error) {
-    // そもそもサーバーにつながらなかったときなど
-    showError("通信エラーが発生しました");
+    showError("通信エラーが発生しました。ポートがパブリックになっているか確認してください。");
   }
 }
 
-/**
- * 新しいTODOを追加する
- */
+// ============================================================
+// 3. 新しく「観たいアニメ」を追加する処理
+// ============================================================
 async function addTodo() {
-  // 入力欄の要素を取得し、入力された文字を読み取る（trimで前後の空白を除去）
   const input = document.getElementById("todo-input");
   const title = input.value.trim();
 
-  // 送信前のチェック（バリデーション）: 空のときは送らずに注意を表示
+  // 空っぽのときは送らない
   if (title === "") {
-    showError("TODOのタイトルを入力してください");
+    showError("アニメのタイトルを入力してください");
     return;
   }
 
-  // 長すぎるときも送らない（サーバー側でも100文字までチェックしている）
+  // 100文字以上のときは送らない
   if (title.length > 100) {
     showError("タイトルは100文字以内で入力してください");
     return;
   }
 
   try {
-    // サーバーに「このTODOを追加して」と送る
+    // サーバーに新しいアニメを登録する
     const response = await fetch(API_URL, {
-      method: "POST", // POST = 新しいデータを作る
-      headers: { "Content-Type": "application/json" }, // 中身はJSON形式だと伝える
-      body: JSON.stringify({ title: title }), // データをJSON文字列にして送る
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      showError(error.detail || "TODOの追加に失敗しました");
-      return;
-    }
-
-    input.value = ""; // 入力欄を空に戻す
-    await loadTodos(); // 一覧を取り直して、追加結果を画面に反映する
-  } catch (error) {
-    showError("通信エラーが発生しました");
-  }
-}
-
-/**
- * TODOの完了状態を切り替える
- * id: 対象のTODOの番号 / currentDone: いまの完了状態(true/false)
- */
-async function toggleTodo(id, currentDone) {
-  try {
-    // `${API_URL}/${id}` で /todos/5 のようなアドレスを作る（id=5のTODOが対象）
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: "PUT", // PUT = 既存のデータを更新する
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !currentDone }), // !で完了/未完了を反転させる
+      body: JSON.stringify({ title: title }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      showError(error.detail || "TODOの更新に失敗しました");
+      showError(error.detail || "アニメの追加に失敗しました");
       return;
     }
 
-    await loadTodos(); // 一覧を取り直して、更新結果を画面に反映する
+    input.value = ""; // 入力欄を空にする
+    await loadTodos(); // リストを再読み込み
   } catch (error) {
     showError("通信エラーが発生しました");
   }
 }
 
-/**
- * TODOを削除する
- * id: 削除したいTODOの番号
- */
+// ============================================================
+// 4. アニメを「観た！」状態に更新する処理
+// ============================================================
+async function watchAnime(id) {
+  try {
+    // サーバーの指定したアニメIDに対して、状態を更新する
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      // main.pyが新しく受け取れるようになった status: "watched" を送る
+      body: JSON.stringify({ status: "watched" }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      showError(error.detail || "視聴状態の更新に失敗しました");
+      return;
+    }
+
+    await loadTodos(); // 画面を更新して移動を反映させる
+  } catch (error) {
+    showError("通信エラーが発生しました");
+  }
+}
+
+// ============================================================
+// 5. アニメを削除する処理
+// ============================================================
 async function deleteTodo(id) {
   try {
-    // /todos/5 のようなアドレスに対して削除を依頼する
     const response = await fetch(`${API_URL}/${id}`, {
-      method: "DELETE", // DELETE = データを削除する
+      method: "DELETE",
     });
 
     if (!response.ok) {
       const error = await response.json();
-      showError(error.detail || "TODOの削除に失敗しました");
+      showError(error.detail || "削除に失敗しました");
       return;
     }
 
-    await loadTodos(); // 一覧を取り直して、削除結果を画面に反映する
+    await loadTodos(); // 一覧を再読み込み
   } catch (error) {
     showError("通信エラーが発生しました");
   }
 }
 
 // ============================================================
-// 描画
+// 6. タブを切り替える処理
 // ============================================================
+function switchTab(tabName) {
+  currentTab = tabName;
+  
+  const tabWant = document.getElementById("tab-want");
+  const tabWatched = document.getElementById("tab-watched");
+  
+  // 見た目の色を切り替える（選ばれているほうに青い下線をつける）
+  if (tabName === 'want') {
+    tabWant.style.borderBottom = "3px solid #007bff";
+    tabWant.style.fontWeight = "bold";
+    tabWant.style.color = "#333";
+    tabWatched.style.borderBottom = "none";
+    tabWatched.style.fontWeight = "normal";
+    tabWatched.style.color = "#777";
+  } else {
+    tabWant.style.borderBottom = "none";
+    tabWant.style.fontWeight = "normal";
+    tabWant.style.color = "#777";
+    tabWatched.style.borderBottom = "3px solid #007bff";
+    tabWatched.style.fontWeight = "bold";
+    tabWatched.style.color = "#333";
+  }
+  
+  // タブが切り替わったらリストを描画し直す
+  loadTodos();
+}
 
-/**
- * TODOリストを描画する（XSS対策: createElement + textContent）
- *
- * 受け取ったTODOの配列をもとに、画面に並べる<li>を1件ずつ組み立てる。
- *
- * 【XSS対策のポイント】
- *  innerHTML に文字列を直接入れると、入力に紛れ込んだ<script>などが
- *  実行されてしまう危険がある（XSS）。そこで textContent を使い、
- *  入力を「ただの文字」として扱うことで、この攻撃を防いでいる。
- */
+// ============================================================
+// 7. 画面にアニメリストを描画する処理
+// ============================================================
 function renderTodos(todos) {
   const list = document.getElementById("todo-list");
-  list.innerHTML = ""; // 古い表示を一度すべて消してから描き直す
+  list.innerHTML = ""; // 古い表示を一度すべて消す
 
-  // todos配列の1件ずつ(todo)について、リストの行を作る
-  todos.forEach((todo) => {
-    // <li> 完了済みなら "done" クラスを足して見た目を変える
+  // いま選んでいるタブ（want か watched）と同じ状態のアニメだけを表示する
+  const filteredTodos = todos.filter((todo) => {
+    const status = todo.status || 'want'; // statusが無ければデフォルトで'want'
+    return status === currentTab;
+  });
+
+  // 絞り込んだアニメを1件ずつ画面に並べる
+  filteredTodos.forEach((todo) => {
     const li = document.createElement("li");
-    li.className = "todo-item" + (todo.done ? " done" : "");
+    li.className = "todo-item";
+    li.style.display = "flex";
+    li.style.justifyContent = "space-between";
+    li.style.alignItems = "center";
+    li.style.padding = "10px";
+    li.style.borderBottom = "1px solid #eee";
 
-    // チェックボックスとタイトルをまとめる<label>
-    const label = document.createElement("label");
-    label.className = "todo-label";
-
-    // 完了チェックボックス
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "todo-checkbox";
-    checkbox.checked = todo.done; // いまの完了状態をチェックに反映
-    // チェックが変わったら、完了状態を切り替える関数を呼ぶ
-    checkbox.addEventListener("change", () => toggleTodo(todo.id, todo.done));
-
-    // TODOのタイトル文字。textContent で安全に入れる（XSS対策）
+    // アニメのタイトル
     const titleSpan = document.createElement("span");
     titleSpan.className = "todo-title";
     titleSpan.textContent = todo.title;
+    li.appendChild(titleSpan);
 
-    // label の中に [チェックボックス][タイトル] を入れる
-    label.appendChild(checkbox);
-    label.appendChild(titleSpan);
+    // 右側のボタンたちをまとめるグループ
+    const btnGroup = document.createElement("div");
 
-    // 削除ボタン。押されたら削除する関数を呼ぶ
+    // 「これから観る」タブの時だけ、「観た！」ボタンを表示する
+    if (currentTab === 'want') {
+      const watchBtn = document.createElement("button");
+      watchBtn.className = "watch-button";
+      watchBtn.textContent = "観た！";
+      watchBtn.style.backgroundColor = "#2ed573";
+      watchBtn.style.color = "white";
+      watchBtn.style.border = "none";
+      watchBtn.style.padding = "5px 10px";
+      watchBtn.style.marginRight = "5px";
+      watchBtn.style.borderRadius = "4px";
+      watchBtn.style.cursor = "pointer";
+      
+      // ボタンが押されたら視聴完了にする
+      watchBtn.addEventListener("click", () => watchAnime(todo.id));
+      btnGroup.appendChild(watchBtn);
+    }
+
+    // 削除ボタン（どっちのタブでも表示）
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-button";
     deleteBtn.textContent = "削除";
+    deleteBtn.style.backgroundColor = "#ff4757";
+    deleteBtn.style.color = "white";
+    deleteBtn.style.border = "none";
+    deleteBtn.style.padding = "5px 10px";
+    deleteBtn.style.borderRadius = "4px";
+    deleteBtn.style.cursor = "pointer";
     deleteBtn.addEventListener("click", () => deleteTodo(todo.id));
+    btnGroup.appendChild(deleteBtn);
 
-    // <li> の中に [label][削除ボタン] を入れて、リストに追加する
-    li.appendChild(label);
-    li.appendChild(deleteBtn);
-
+    li.appendChild(btnGroup);
     list.appendChild(li);
   });
 }
 
 // ============================================================
-// メッセージ表示
+// 8. メッセージ表示 & イベント設定
 // ============================================================
-
-// エラーメッセージを画面に表示する（5秒後に自動で消える）
 function showError(message) {
   const errorDiv = document.getElementById("error-message");
-  errorDiv.textContent = message; // メッセージを表示
-  errorDiv.style.display = "block"; // 見えるようにする
-  // setTimeout: 指定したミリ秒後に処理を実行する。5000ミリ秒 = 5秒
+  errorDiv.textContent = message;
+  errorDiv.style.display = "block";
   setTimeout(() => {
-    errorDiv.style.display = "none"; // 5秒後に隠す
+    errorDiv.style.display = "none";
   }, 5000);
 }
 
-// ============================================================
-// イベントリスナー
-// ============================================================
-
-// フォームが送信された（追加ボタン or Enter）ときの動き
+// フォームが送信されたときの動き
 document.getElementById("todo-form").addEventListener("submit", function (e) {
-  e.preventDefault(); // ページが再読み込みされる標準動作を止める
-  addTodo(); // 自分で用意した追加処理を呼ぶ
+  e.preventDefault();
+  addTodo();
 });
 
-// ページ読み込み時に、まずTODO一覧を取得して表示する（ここがスタート地点）
+// アプリが起動したときに、最初にデータを読み込む
 loadTodos();
+
