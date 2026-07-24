@@ -1,23 +1,12 @@
 /**
- * TODO App JavaScript - 完成版
- * 第8回: セキュリティの基礎 & 総仕上げ
+ * アニメ視聴記録 App JavaScript - 話数カウンター版
  *
  * 【このファイルの役割】
  *  ブラウザの画面（HTML）と、バックエンド（main.py）の橋渡しをする。
- *
- * 【全体の流れ】
- *  1. ページが開かれる → loadTodos() でサーバーからTODO一覧を取得
- *  2. renderTodos() が、取得したデータを画面のリストとして描画する
- *  3. ユーザーが「追加・チェック・削除」を操作する
- *     → 対応する関数がサーバーに変更を送る（fetch）
- *     → 最後にもう一度 loadTodos() して、最新の状態を画面に反映する
- *
- * ※ fetch はサーバーと通信する命令。通信は時間がかかるので、
- *   async / await を使って「結果が返ってくるまで待つ」書き方をしている。
  */
 
-// サーバー側のAPIのアドレス（main.py の @app.get("/todos") などに対応）
-const API_URL = "https://cuddly-couscous-7v4xv9x6qqggfr5w6-8000.app.github.dev/todos";
+// サーバー側のAPIのアドレス
+const API_URL = "/animes";
 
 // 現在どちらのタブを開いているかを覚えておく変数（初期値は 'want': これから観る）
 let currentTab = 'want';
@@ -27,7 +16,6 @@ let currentTab = 'want';
 // ============================================================
 async function loadTodos() {
   try {
-    // サーバーに「アニメ一覧をください」とお願いする
     const response = await fetch(API_URL);
 
     if (!response.ok) {
@@ -36,7 +24,6 @@ async function loadTodos() {
       return;
     }
 
-    // 返ってきたデータをJavaScriptの配列に変換して画面に描画する
     const todos = await response.json();
     renderTodos(todos);
   } catch (error) {
@@ -45,30 +32,31 @@ async function loadTodos() {
 }
 
 // ============================================================
-// 3. 新しく「観たいアニメ」を追加する処理
+// 3. 新しく「観たいアニメ」を追加する処理（総話数対応）
 // ============================================================
 async function addTodo() {
   const input = document.getElementById("todo-input");
+  const totalEpInput = document.getElementById("todo-total-ep"); // 👈 総話数の入力欄を取得
+  
   const title = input.value.trim();
+  const totalEp = parseInt(totalEpInput.value, 10) || 12; // 数字に変換（空なら12）
 
-  // 空っぽのときは送らない
   if (title === "") {
     showError("アニメのタイトルを入力してください");
     return;
   }
 
-  // 100文字以上のときは送らない
   if (title.length > 100) {
     showError("タイトルは100文字以内で入力してください");
     return;
   }
 
   try {
-    // サーバーに新しいアニメを登録する
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title }),
+      // 👈 タイトルと一緒に総話数（total_ep）もサーバーに送る
+      body: JSON.stringify({ title: title, total_ep: totalEp }),
     });
 
     if (!response.ok) {
@@ -78,6 +66,7 @@ async function addTodo() {
     }
 
     input.value = ""; // 入力欄を空にする
+    totalEpInput.value = "12"; // 総話数を12に戻す
     await loadTodos(); // リストを再読み込み
   } catch (error) {
     showError("通信エラーが発生しました");
@@ -89,11 +78,9 @@ async function addTodo() {
 // ============================================================
 async function watchAnime(id) {
   try {
-    // サーバーの指定したアニメIDに対して、状態を更新する
     const response = await fetch(`${API_URL}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      // main.pyが新しく受け取れるようになった status: "watched" を送る
       body: JSON.stringify({ status: "watched" }),
     });
 
@@ -103,7 +90,28 @@ async function watchAnime(id) {
       return;
     }
 
-    await loadTodos(); // 画面を更新して移動を反映させる
+    await loadTodos();
+  } catch (error) {
+    showError("通信エラーが発生しました");
+  }
+}
+
+// ============================================================
+// 【新機能】話数を1つ進める（+1話）処理
+// ============================================================
+async function incrementEpisode(id) {
+  try {
+    const response = await fetch(`${API_URL}/${id}/increment`, {
+      method: "PUT"
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      showError(error.detail || "話数の更新に失敗しました");
+      return;
+    }
+
+    await loadTodos(); // 画面を更新（最終話に達したら自動でタブが移動します）
   } catch (error) {
     showError("通信エラーが発生しました");
   }
@@ -124,7 +132,7 @@ async function deleteTodo(id) {
       return;
     }
 
-    await loadTodos(); // 一覧を再読み込み
+    await loadTodos();
   } catch (error) {
     showError("通信エラーが発生しました");
   }
@@ -139,7 +147,6 @@ function switchTab(tabName) {
   const tabWant = document.getElementById("tab-want");
   const tabWatched = document.getElementById("tab-watched");
   
-  // 見た目の色を切り替える（選ばれているほうに青い下線をつける）
   if (tabName === 'want') {
     tabWant.style.borderBottom = "3px solid #007bff";
     tabWant.style.fontWeight = "bold";
@@ -156,24 +163,22 @@ function switchTab(tabName) {
     tabWatched.style.color = "#333";
   }
   
-  // タブが切り替わったらリストを描画し直す
   loadTodos();
 }
 
 // ============================================================
-// 7. 画面にアニメリストを描画する処理
+// 7. 画面にアニメリストを描画する処理（話数カウンター対応）
 // ============================================================
 function renderTodos(todos) {
   const list = document.getElementById("todo-list");
-  list.innerHTML = ""; // 古い表示を一度すべて消す
+  if (!list) return;
+  list.innerHTML = ""; 
 
-  // いま選んでいるタブ（want か watched）と同じ状態のアニメだけを表示する
   const filteredTodos = todos.filter((todo) => {
-    const status = todo.status || 'want'; // statusが無ければデフォルトで'want'
+    const status = todo.status || 'want';
     return status === currentTab;
   });
 
-  // 絞り込んだアニメを1件ずつ画面に並べる
   filteredTodos.forEach((todo) => {
     const li = document.createElement("li");
     li.className = "todo-item";
@@ -183,17 +188,49 @@ function renderTodos(todos) {
     li.style.padding = "10px";
     li.style.borderBottom = "1px solid #eee";
 
-    // アニメのタイトル
+    // 左側：タイトルと話数表示をまとめるエリア
+    const infoDiv = document.createElement("div");
+    infoDiv.style.display = "flex";
+    infoDiv.style.flexDirection = "column";
+    infoDiv.style.gap = "4px";
+
     const titleSpan = document.createElement("span");
     titleSpan.className = "todo-title";
     titleSpan.textContent = todo.title;
-    li.appendChild(titleSpan);
+    if (currentTab === 'watched') {
+      titleSpan.style.textDecoration = "line-through";
+      titleSpan.style.color = "#888";
+    }
+    infoDiv.appendChild(titleSpan);
 
-    // 右側のボタンたちをまとめるグループ
+    // 👈 話数のテキスト表示を追加 (例: 3 / 12 話)
+    const epSpan = document.createElement("span");
+    epSpan.style.fontSize = "13px";
+    epSpan.style.color = "#666";
+    epSpan.textContent = `話数: ${todo.current_ep} / ${todo.total_ep} 話`;
+    infoDiv.appendChild(epSpan);
+
+    li.appendChild(infoDiv);
+
+    // 右側：ボタングループ
     const btnGroup = document.createElement("div");
+    btnGroup.style.display = "flex";
+    btnGroup.style.gap = "5px";
 
-    // 「これから観る」タブの時だけ、「観た！」ボタンを表示する
+    // 「これから観る」タブの時だけ、「＋1話」と「観た！」ボタンを表示する
     if (currentTab === 'want') {
+      // 👈 【新機能】＋1話進めるボタン
+      const plusBtn = document.createElement("button");
+      plusBtn.textContent = "+1話";
+      plusBtn.style.backgroundColor = "#007bff";
+      plusBtn.style.color = "white";
+      plusBtn.style.border = "none";
+      plusBtn.style.padding = "5px 10px";
+      plusBtn.style.borderRadius = "4px";
+      plusBtn.style.cursor = "pointer";
+      plusBtn.addEventListener("click", () => incrementEpisode(todo.id));
+      btnGroup.appendChild(plusBtn);
+
       const watchBtn = document.createElement("button");
       watchBtn.className = "watch-button";
       watchBtn.textContent = "観た！";
@@ -201,16 +238,13 @@ function renderTodos(todos) {
       watchBtn.style.color = "white";
       watchBtn.style.border = "none";
       watchBtn.style.padding = "5px 10px";
-      watchBtn.style.marginRight = "5px";
       watchBtn.style.borderRadius = "4px";
       watchBtn.style.cursor = "pointer";
-      
-      // ボタンが押されたら視聴完了にする
       watchBtn.addEventListener("click", () => watchAnime(todo.id));
       btnGroup.appendChild(watchBtn);
     }
 
-    // 削除ボタン（どっちのタブでも表示）
+    // 削除ボタン
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-button";
     deleteBtn.textContent = "削除";
@@ -233,6 +267,10 @@ function renderTodos(todos) {
 // ============================================================
 function showError(message) {
   const errorDiv = document.getElementById("error-message");
+  if (!errorDiv) {
+    alert(message);
+    return;
+  }
   errorDiv.textContent = message;
   errorDiv.style.display = "block";
   setTimeout(() => {
@@ -241,11 +279,13 @@ function showError(message) {
 }
 
 // フォームが送信されたときの動き
-document.getElementById("todo-form").addEventListener("submit", function (e) {
-  e.preventDefault();
-  addTodo();
-});
+const todoForm = document.getElementById("todo-form");
+if (todoForm) {
+  todoForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    addTodo();
+  });
+}
 
 // アプリが起動したときに、最初にデータを読み込む
 loadTodos();
-
