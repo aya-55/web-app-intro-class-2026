@@ -17,6 +17,18 @@
       <!-- エラーメッセージ表示エリア -->
       <div id="error-message" class="error-message" style="display: none"></div>
 
+      <!-- 🏆 アニメ視聴データダッシュボード -->
+      <div class="stats-area" style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div style="flex: 1; background: #f1f2f6; padding: 10px; border-radius: 8px; text-align: center; border-left: 5px solid #2ed573;">
+          <span style="font-size: 12px; color: #666; display: block;">観終えた作品</span>
+          <strong id="total-anime-count" style="font-size: 20px; color: #2ed573;">0</strong> <span style="font-size: 12px;">本</span>
+        </div>
+        <div style="flex: 1; background: #f1f2f6; padding: 10px; border-radius: 8px; text-align: center; border-left: 5px solid #007bff;">
+          <span style="font-size: 12px; color: #666; display: block;">トータル視聴話数</span>
+          <strong id="total-episode-count" style="font-size: 20px; color: #007bff;">0</strong> <span style="font-size: 12px;">話</span>
+        </div>
+      </div>
+
       <!-- アニメ入力エリア -->
       <form id="todo-form" class="input-area" style="display: flex; gap: 10px;">
         <input
@@ -51,6 +63,11 @@
           autocomplete="off"
           style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
         />
+      </div>
+            <!-- 🛠️ 一括選択・操作エリア -->
+      <div class="bulk-actions" style="margin: 10px 0; display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="bulkWatch()" id="bulk-watch-btn" style="background-color: #2ed573; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; display: none;">選択した作品を観た！</button>
+        <button type="button" onclick="bulkDelete()" style="background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;">選択した作品を削除</button>
       </div>
 
       <!-- タブメニュー -->
